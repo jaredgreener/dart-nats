@@ -26,7 +26,7 @@ var messageStream = client.subscribe("foo");
 
 // If more than one subscriber uses the same queue group,
 // only one will receive the message
-var messageStream = client.subscribe("foo", "group-1");
+var messageStream = client.subscribe("foo", queueGroup: "group-1");
 
 messageStream.listen((message) {
     // Do something awesome

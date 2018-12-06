@@ -111,7 +111,7 @@ class NatsClient {
   }
 
   Stream<NatsMessage> subscribe(String subscriberId, String subject,
-      {void onData(String message), String queueGroup}) {
+      {String queueGroup}) {
     String messageBuffer;
 
     if (queueGroup != null) {
