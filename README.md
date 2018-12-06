@@ -22,11 +22,11 @@ client.publish("Hello world", "foo", "bar");
 ### Subscribing to messages
 To subscribe to a topic, specify the topic and optionally, a queue group
 ```dart
-var messageStream = client.subscribe("foo");
+var messageStream = client.subscribe("sub-id", "foo");
 
 // If more than one subscriber uses the same queue group,
 // only one will receive the message
-var messageStream = client.subscribe("foo", queueGroup: "group-1");
+var messageStream = client.subscribe("sub-id", "foo", queueGroup: "group-1");
 
 messageStream.listen((message) {
     // Do something awesome
