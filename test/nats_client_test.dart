@@ -5,4 +5,4 @@ void main() async {
   await client.connect();
 
   client.publish("Hello world", "foo");
-  }
+}

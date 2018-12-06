@@ -69,8 +69,6 @@ class NatsClient {
 
   void sendPong() {
     _socket.write("PONG$CR_LF");
-    _socket.flush();
-    _socket.close();
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response
@@ -85,8 +83,6 @@ class NatsClient {
       messageBuffer = "PUB $subject $length $CR_LF$message$CR_LF";
     }
     _socket.write(messageBuffer);
-    _socket.flush();
-    _socket.close();
   }
 
   NatsMessage convertToMessage(String serverPushString) {
