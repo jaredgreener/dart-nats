@@ -40,13 +40,11 @@ class NatsClient {
     String messagePrefix = "MSG ";
     String pingPrefix = "PING";
 
-    print("Received $serverPushString");
-
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""));
     } else if (serverPushString.startsWith(messagePrefix)) {
-      serverPushString = serverPushString.replaceFirst(messagePrefix, "");
-      messagesController.add(convertToMessage(serverPushString));
+      convertToMessages(serverPushString)
+          .forEach((msg) => messagesController.add(msg));
     } else if (serverPushString.startsWith(pingPrefix)) {
       sendPong();
     }
@@ -85,7 +83,6 @@ class NatsClient {
       messageBuffer = "PUB $subject $length $CR_LF$message$CR_LF";
     }
     try {
-      print("Writing to socket");
       _socket.write(messageBuffer);
     } catch (ex) {
       print(ex);
@@ -112,6 +109,13 @@ class NatsClient {
     message.payload = lines[1];
     return message;
   }
+
+  List<NatsMessage> convertToMessages(String serverPushString) =>
+      serverPushString
+          .split("MSG ")
+          .where((msg) => msg.length > 0)
+          .map((msg) => convertToMessage(msg))
+          .toList();
 
   Stream<NatsMessage> subscribe(String subscriberId, String subject,
       {String queueGroup}) {
