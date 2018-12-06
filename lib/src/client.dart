@@ -2,6 +2,7 @@ import 'constants.dart';
 import 'tcp_client.dart';
 import 'server_info.dart';
 import 'nats_message.dart';
+import 'connection_options.dart';
 
 import 'dart:io';
 import "dart:convert";
@@ -21,14 +22,25 @@ class NatsClient {
   }
 
   /// Connects to the given NATS url
-  void connect() async {
+  ///
+  /// ```dart
+  /// var client = NatsClient("localhost", 4222);
+  /// var options = ConnectionOptions()
+  /// options
+  ///  ..verbose = true
+  ///  ..pedantic = false
+  ///  ..tlsRequired = false
+  /// await client.connect(connectionOptions: options);
+  /// ```
+  void connect({ConnectionOptions connectionOptions}) async {
     _socket = await _tcpClient.connect();
     _socket.transform(utf8.decoder).listen((data) {
-      _serverPushString(data);
+      _serverPushString(data, connectionOptions: connectionOptions);
     });
   }
 
-  void _serverPushString(String serverPushString) {
+  void _serverPushString(String serverPushString,
+      {ConnectionOptions connectionOptions}) {
     String infoPrefix = INFO;
     String messagePrefix = MSG;
     String pingPrefix = PING;
