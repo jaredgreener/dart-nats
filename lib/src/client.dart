@@ -1,5 +1,3 @@
-import 'package:rxdart/rxdart.dart';
-
 import 'constants.dart';
 import 'tcp_client.dart';
 import 'server_info.dart';
@@ -10,41 +8,36 @@ import "dart:convert";
 import 'dart:async';
 
 class NatsClient {
-  String host;
-  int port;
-
   Socket _socket;
-  TcpClient tcpClient;
-  ServerInfo serverInfo;
+  TcpClient _tcpClient;
+  ServerInfo _serverInfo;
 
-  StreamController<NatsMessage> messagesController;
+  StreamController<NatsMessage> _messagesController;
 
   NatsClient(String host, int port) {
-    this.host = host;
-    serverInfo = ServerInfo();
-    messagesController = new StreamController.broadcast();
-    tcpClient = TcpClient(host: host, port: port);
+    _serverInfo = ServerInfo();
+    _messagesController = new StreamController.broadcast();
+    _tcpClient = TcpClient(host: host, port: port);
   }
 
-  bool checkSocketReady() => _socket != null;
-
+  /// Connects to the given NATS url
   void connect() async {
-    _socket = await tcpClient.connect();
+    _socket = await _tcpClient.connect();
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data);
     });
   }
 
   void _serverPushString(String serverPushString) {
-    String infoPrefix = "INFO ";
-    String messagePrefix = "MSG ";
-    String pingPrefix = "PING";
+    String infoPrefix = INFO;
+    String messagePrefix = MSG;
+    String pingPrefix = PING;
 
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""));
     } else if (serverPushString.startsWith(messagePrefix)) {
-      convertToMessages(serverPushString)
-          .forEach((msg) => messagesController.add(msg));
+      _convertToMessages(serverPushString)
+          .forEach((msg) => _messagesController.add(msg));
     } else if (serverPushString.startsWith(pingPrefix)) {
       sendPong();
     }
@@ -54,21 +47,21 @@ class NatsClient {
     print(serverInfoString);
     try {
       Map<String, dynamic> map = jsonDecode(serverInfoString);
-      serverInfo.serverId = map["server_id"];
-      serverInfo.version = map["version"];
-      serverInfo.protocolVersion = map["proto"];
-      serverInfo.goVersion = map["go"];
-      serverInfo.host = map["host"];
-      serverInfo.port = map["port"];
-      serverInfo.maxPayload = map["max_payload"];
-      serverInfo.clientId = map["client_id"];
+      _serverInfo.serverId = map["server_id"];
+      _serverInfo.version = map["version"];
+      _serverInfo.protocolVersion = map["proto"];
+      _serverInfo.goVersion = map["go"];
+      _serverInfo.host = map["host"];
+      _serverInfo.port = map["port"];
+      _serverInfo.maxPayload = map["max_payload"];
+      _serverInfo.clientId = map["client_id"];
     } catch (ex) {
       print(ex.toString());
     }
   }
 
   void sendPong() {
-    _socket.write("PONG$CR_LF");
+    _socket.write("$PONG$CR_LF");
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response
@@ -78,9 +71,9 @@ class NatsClient {
     int length = message.length;
 
     if (replyTo != null) {
-      messageBuffer = "PUB $subject $replyTo $length $CR_LF$message$CR_LF";
+      messageBuffer = "$PUB $subject $replyTo $length $CR_LF$message$CR_LF";
     } else {
-      messageBuffer = "PUB $subject $length $CR_LF$message$CR_LF";
+      messageBuffer = "$PUB $subject $length $CR_LF$message$CR_LF";
     }
     try {
       _socket.write(messageBuffer);
@@ -110,9 +103,9 @@ class NatsClient {
     return message;
   }
 
-  List<NatsMessage> convertToMessages(String serverPushString) =>
+  List<NatsMessage> _convertToMessages(String serverPushString) =>
       serverPushString
-          .split("MSG ")
+          .split(MSG)
           .where((msg) => msg.length > 0)
           .map((msg) => convertToMessage(msg))
           .toList();
@@ -122,11 +115,22 @@ class NatsClient {
     String messageBuffer;
 
     if (queueGroup != null) {
-      messageBuffer = "SUB $subject $queueGroup $subscriberId$CR_LF";
+      messageBuffer = "$SUB $subject $queueGroup $subscriberId$CR_LF";
     } else {
-      messageBuffer = "SUB $subject $subscriberId$CR_LF";
+      messageBuffer = "$SUB $subject $subscriberId$CR_LF";
     }
     _socket.write(messageBuffer);
-    return messagesController.stream.where((msg) => msg.subject == subject);
+    return _messagesController.stream.where((msg) => msg.subject == subject);
+  }
+
+  void unsubscribe(String subscriberId, {int waitUntilMessageCount}) {
+    String messageBuffer;
+
+    if (waitUntilMessageCount != null) {
+      messageBuffer = "$UNSUB $subscriberId $waitUntilMessageCount$CR_LF";
+    } else {
+      messageBuffer = "$UNSUB $subscriberId$CR_LF";
+    }
+    _socket.write(messageBuffer);
   }
 }

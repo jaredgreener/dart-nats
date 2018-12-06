@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'package:rxdart/rxdart.dart';
-import 'constants.dart';
 
 /// Class to handle NATS-text interaction
 class TcpClient {

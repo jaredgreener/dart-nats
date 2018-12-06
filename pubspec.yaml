@@ -7,4 +7,3 @@ environment:
 
 dependencies:
   test: any
-  rxdart: any
