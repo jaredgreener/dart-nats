@@ -9,5 +9,5 @@ class TcpClient {
   TcpClient({this.host, this.port});
 
   /// Returns an observable of either a [Socket] or an [Exception]
-  Observable<Socket> connect() => Observable.fromFuture((Socket.connect(host, port)));
+  Observable<Socket> connect() => Observable.fromFuture((Socket.connect(host, port)));  
 }
