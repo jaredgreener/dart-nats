@@ -1,13 +1,10 @@
 import 'package:nats/nats.dart';
 import 'package:test/test.dart';
+import "dart:io";
 
-void main() {
-  final client = TcpClient(host: "localhost", port: 4222);
-  client.connect().listen((socket) {
-    
-  }, onError: (err) {
-    print("Got error");
-  }, onDone: () {
-    print("Done");
-  });
+void main() async {
+  NatsClient client = NatsClient("localhost", 4222);
+  await client.connect();
+  assert(client.checkSocketReady());
+  client.publish("Hello", "foo");
 }

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:rxdart/rxdart.dart';
+import 'constants.dart';
 
 /// Class to handle NATS-text interaction
 class TcpClient {
@@ -9,5 +10,5 @@ class TcpClient {
   TcpClient({this.host, this.port});
 
   /// Returns an observable of either a [Socket] or an [Exception]
-  Observable<Socket> connect() => Observable.fromFuture((Socket.connect(host, port)));  
+  Future<Socket> connect() => Socket.connect(host, port);
 }
