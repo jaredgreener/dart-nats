@@ -41,6 +41,7 @@ class NatsClient {
 
   void _serverPushString(String serverPushString,
       {ConnectionOptions connectionOptions}) {
+    print(serverPushString);
     String infoPrefix = INFO;
     String messagePrefix = MSG;
     String pingPrefix = PING;
@@ -80,6 +81,7 @@ class NatsClient {
     var messageBuffer = CONNECT +
         "{\"verbose\":${opts.verbose},\"pedantic\":${opts.pedantic},\"tls_required\":${opts.tlsRequired},\"name\":${opts.name},\"lang\":${opts.language},\"version\":${opts.version},\"protocol\":${opts.protocol}, \"user\":${opts.userName}, \"pass\":${opts.password}}" +
         CR_LF;
+    print("Writing connection message $messageBuffer");
     _socket.write(messageBuffer);
   }
 
@@ -95,6 +97,11 @@ class NatsClient {
   /// client.publish("Hello World", "foo-topic", replyTo: "reply-topic");
   /// ```
   void publish(String message, String subject, {String replyTo}) {
+    if (_socket == null) {
+      throw Exception(
+          "Socket not ready. Please check if NatsClient.connect() is called");
+    }
+
     String messageBuffer;
 
     int length = message.length;
@@ -141,6 +148,10 @@ class NatsClient {
 
   Stream<NatsMessage> subscribe(String subscriberId, String subject,
       {String queueGroup}) {
+    if (_socket == null) {
+      throw Exception(
+          "Socket not ready. Please check if NatsClient.connect() is called");
+    }
     String messageBuffer;
 
     if (queueGroup != null) {
@@ -148,12 +159,16 @@ class NatsClient {
     } else {
       messageBuffer = "$SUB $subject $subscriberId$CR_LF";
     }
-    
+
     _socket.write(messageBuffer);
     return _messagesController.stream.where((msg) => msg.subject == subject);
   }
 
   void unsubscribe(String subscriberId, {int waitUntilMessageCount}) {
+    if (_socket == null) {
+      throw Exception(
+          "Socket not ready. Please check if NatsClient.connect() is called");
+    }
     String messageBuffer;
 
     if (waitUntilMessageCount != null) {
