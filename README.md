@@ -28,7 +28,7 @@ Publishing a message can be done with or without a `reply-to` topic
 client.publish("Hello world", "foo");
 
 // If server replies to this request, send it to `bar`
-client.publish("Hello world", "foo", "bar");
+client.publish("Hello world", "foo", replyTo: "bar");
 ```
 
 ### Subscribing to messages

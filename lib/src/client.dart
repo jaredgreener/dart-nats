@@ -77,6 +77,12 @@ class NatsClient {
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response
+  /// ```dart
+  /// var client = NatsClient("localhost", 4222);
+  /// await client.connect();
+  /// client.publish("Hello World", "foo-topic");
+  /// client.publish("Hello World", "foo-topic", replyTo: "reply-topic");
+  /// ```
   void publish(String message, String subject, {String replyTo}) {
     String messageBuffer;
 
