@@ -40,6 +40,8 @@ class NatsClient {
     String messagePrefix = "MSG ";
     String pingPrefix = "PING";
 
+    print("Received $serverPushString");
+
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""));
     } else if (serverPushString.startsWith(messagePrefix)) {
@@ -82,7 +84,12 @@ class NatsClient {
     } else {
       messageBuffer = "PUB $subject $length $CR_LF$message$CR_LF";
     }
-    _socket.write(messageBuffer);
+    try {
+      print("Writing to socket");
+      _socket.write(messageBuffer);
+    } catch (ex) {
+      print(ex);
+    }
   }
 
   NatsMessage convertToMessage(String serverPushString) {

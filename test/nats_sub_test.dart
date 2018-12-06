@@ -4,5 +4,7 @@ void main() async {
   var client = NatsClient("localhost", 4222);
   await client.connect();
 
-  client.publish("Hello world", "foo");
+  client.subscribe("sub-id", "foo").listen((msg) {
+    print("Received at listener: ${msg.payload}");
+  });
 }
