@@ -38,12 +38,15 @@ class NatsClient {
   void _serverPushString(String serverPushString) {
     String infoPrefix = "INFO ";
     String messagePrefix = "MSG ";
+    String pingPrefix = "PING";
 
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""));
     } else if (serverPushString.startsWith(messagePrefix)) {
       serverPushString = serverPushString.replaceFirst(messagePrefix, "");
       messagesController.add(convertToMessage(serverPushString));
+    } else if (serverPushString.startsWith(pingPrefix)) {
+      sendPong();
     }
   }
 
@@ -62,6 +65,12 @@ class NatsClient {
     } catch (ex) {
       print(ex.toString());
     }
+  }
+
+  void sendPong() {
+    _socket.write("PONG$CR_LF");
+    _socket.flush();
+    _socket.close();
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response
