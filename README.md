@@ -1,6 +1,15 @@
 # nats-dart
 NATS client to usage in Dart CLI, Web and Flutter projects
 
+### Generating documentation
+Documentation is generated using the `dartdoc` tool
+```shell
+dartdoc
+pub global activate dhttpd
+dhttpd --path doc/api
+```
+Navigate to http://localhost:8080 and voila!! :boom:
+
 ### Setting up a client
 Setting up a client and firing up a connection
 ```dart
