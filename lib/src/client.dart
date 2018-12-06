@@ -46,7 +46,8 @@ class NatsClient {
     String pingPrefix = PING;
 
     if (serverPushString.startsWith(infoPrefix)) {
-      _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""));
+      _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""),
+          connectionOptions: connectionOptions);
     } else if (serverPushString.startsWith(messagePrefix)) {
       _convertToMessages(serverPushString)
           .forEach((msg) => _messagesController.add(msg));
@@ -55,8 +56,8 @@ class NatsClient {
     }
   }
 
-  void _setServerInfo(String serverInfoString) {
-    print(serverInfoString);
+  void _setServerInfo(String serverInfoString,
+      {ConnectionOptions connectionOptions}) {
     try {
       Map<String, dynamic> map = jsonDecode(serverInfoString);
       _serverInfo.serverId = map["server_id"];
@@ -67,9 +68,19 @@ class NatsClient {
       _serverInfo.port = map["port"];
       _serverInfo.maxPayload = map["max_payload"];
       _serverInfo.clientId = map["client_id"];
+      if (connectionOptions != null) {
+        _sendConnectionPacket(connectionOptions);
+      }
     } catch (ex) {
       print(ex.toString());
     }
+  }
+
+  void _sendConnectionPacket(ConnectionOptions opts) {
+    var messageBuffer = CONNECT +
+        "{\"verbose\":${opts.verbose},\"pedantic\":${opts.pedantic},\"tls_required\":${opts.tlsRequired},\"name\":${opts.name},\"lang\":${opts.language},\"version\":${opts.version},\"protocol\":${opts.protocol}, \"user\":${opts.userName}, \"pass\":${opts.password}}" +
+        CR_LF;
+    _socket.write(messageBuffer);
   }
 
   void sendPong() {
@@ -137,6 +148,7 @@ class NatsClient {
     } else {
       messageBuffer = "$SUB $subject $subscriberId$CR_LF";
     }
+    
     _socket.write(messageBuffer);
     return _messagesController.stream.where((msg) => msg.subject == subject);
   }

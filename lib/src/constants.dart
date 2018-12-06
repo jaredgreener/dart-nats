@@ -23,3 +23,4 @@ const UNSUB = "UNSUB ";
 const INFO = "INFO ";
 const PING = "PING";
 const PONG = "PONG";
+const CONNECT = "CONNECT ";
