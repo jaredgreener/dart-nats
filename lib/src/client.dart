@@ -41,7 +41,6 @@ class NatsClient {
 
   void _serverPushString(String serverPushString,
       {ConnectionOptions connectionOptions}) {
-    print(serverPushString);
     String infoPrefix = INFO;
     String messagePrefix = MSG;
     String pingPrefix = PING;
@@ -146,6 +145,17 @@ class NatsClient {
           .map((msg) => convertToMessage(msg))
           .toList();
 
+  /// Subscribes to the [subject] with a given [subscriberId] and an optional [queueGroup] set to group the responses
+  /// ```dart
+  /// var client = NatsClient("localhost", 4222);
+  /// await client.connect();
+  /// var messageStream = client.subscribe("sub-1", "foo-topic"); // No [queueGroup] set
+  /// var messageStream = client.subscribe("sub-1", "foo-topic", queueGroup: "group-1")
+  ///
+  /// messageStream.listen((message) {
+  ///   // Do something awesome
+  /// });
+  /// ```
   Stream<NatsMessage> subscribe(String subscriberId, String subject,
       {String queueGroup}) {
     if (_socket == null) {
