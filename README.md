@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/munukutla/nats-dart.svg?branch=master)](https://travis-ci.com/munukutla/nats-dart)
+
 # nats-dart
 NATS client to usage in Dart CLI, Web and Flutter projects
 
