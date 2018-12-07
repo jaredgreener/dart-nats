@@ -55,7 +55,9 @@ class NatsClient {
           connectionOptions: connectionOptions);
 
       // If it is a new serverinfo packet, then call the update handler
-      onClusterupdate(_serverInfo);
+      if (onClusterupdate != null) {
+        onClusterupdate(_serverInfo);
+      }
     } else if (serverPushString.startsWith(messagePrefix)) {
       _convertToMessages(serverPushString)
           .forEach((msg) => _messagesController.add(msg));
