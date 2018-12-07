@@ -32,15 +32,20 @@ class NatsClient {
   ///  ..tlsRequired = false
   /// await client.connect(connectionOptions: options);
   /// ```
-  void connect({ConnectionOptions connectionOptions}) async {
+  void connect(
+      {ConnectionOptions connectionOptions,
+      void onClusterupdate(ServerInfo info)}) async {
     _socket = await _tcpClient.connect();
     _socket.transform(utf8.decoder).listen((data) {
-      _serverPushString(data, connectionOptions: connectionOptions);
+      _serverPushString(data,
+          connectionOptions: connectionOptions,
+          onClusterupdate: onClusterupdate);
     });
   }
 
   void _serverPushString(String serverPushString,
-      {ConnectionOptions connectionOptions}) {
+      {ConnectionOptions connectionOptions,
+      void onClusterupdate(ServerInfo info)}) {
     String infoPrefix = INFO;
     String messagePrefix = MSG;
     String pingPrefix = PING;
@@ -48,6 +53,9 @@ class NatsClient {
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""),
           connectionOptions: connectionOptions);
+
+      // If it is a new serverinfo packet, then call the update handler
+      onClusterupdate(_serverInfo);
     } else if (serverPushString.startsWith(messagePrefix)) {
       _convertToMessages(serverPushString)
           .forEach((msg) => _messagesController.add(msg));
