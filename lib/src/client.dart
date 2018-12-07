@@ -9,6 +9,12 @@ import "dart:convert";
 import 'dart:async';
 
 class NatsClient {
+  String _currentHost;
+  int _currentPort;
+
+  String get currentHost => _currentHost;
+  int get currentPort => _currentPort;
+
   Socket _socket;
   TcpClient _tcpClient;
   ServerInfo _serverInfo;
@@ -16,6 +22,9 @@ class NatsClient {
   StreamController<NatsMessage> _messagesController;
 
   NatsClient(String host, int port) {
+    _currentHost = host;
+    _currentPort = port;
+
     _serverInfo = ServerInfo();
     _messagesController = new StreamController.broadcast();
     _tcpClient = TcpClient(host: host, port: port);
@@ -36,10 +45,48 @@ class NatsClient {
       {ConnectionOptions connectionOptions,
       void onClusterupdate(ServerInfo info)}) async {
     _socket = await _tcpClient.connect();
+
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data,
           connectionOptions: connectionOptions,
           onClusterupdate: onClusterupdate);
+    }, onDone: () {
+      print("Host down. Switching to next available host in cluster");
+      _removeCurrentHostFromServerInfo(_currentHost, _currentPort);
+      _reconnectToNextAvailableInCluster(
+          opts: connectionOptions, onClusterupdate: onClusterupdate);
+    });
+  }
+
+  void _removeCurrentHostFromServerInfo(String host, int port) =>
+      _serverInfo.serverUrls.removeWhere((url) => url == "$host:$port");
+
+  void _reconnectToNextAvailableInCluster(
+      {ConnectionOptions opts, void onClusterupdate(ServerInfo info)}) {
+    var urls = _serverInfo.serverUrls;
+
+    bool isIPv6Address(String url) => url.contains("[") && url.contains("]");
+
+    urls.forEach((url) async {
+      print("Trying to connect to $url now");
+      int port = int.parse(url.split(":")[url.split(":").length - 1]);
+      String host;
+      if (isIPv6Address(url)) {
+        // IPv6 address
+        host = url.substring(url.indexOf("[") + 1, url.indexOf("]"));
+      } else {
+        // IPv4 address
+        host = url.substring(0, url.indexOf(":"));
+      }
+      _tcpClient = TcpClient(host: host, port: port);
+      try {
+        await connect(
+            connectionOptions: opts, onClusterupdate: onClusterupdate);
+        print("Successfully switched to $url now");
+        return;
+      } catch (ex) {
+        print("Tried connecting to $url but failed. Moving on");
+      }
     });
   }
 
@@ -80,7 +127,9 @@ class NatsClient {
       _serverInfo.maxPayload = map["max_payload"];
       _serverInfo.clientId = map["client_id"];
       try {
+        if (map["connect_urls"] != null) {
           _serverInfo.serverUrls = map["connect_urls"].cast<String>();
+        }
       } catch (e) {
         print(e.toString());
       }
