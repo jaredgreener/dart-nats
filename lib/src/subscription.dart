@@ -1,5 +1,5 @@
 class Subscription {
   String subscriptionId;
-  String topic;
+  String subject;
   String queueGroup;
 }

@@ -4,6 +4,7 @@ import 'server_info.dart';
 import 'nats_message.dart';
 import 'connection_options.dart';
 import 'subscription.dart';
+import 'protocol_handler.dart';
 
 import 'dart:io';
 import "dart:convert";
@@ -24,6 +25,7 @@ class NatsClient {
 
   StreamController<NatsMessage> _messagesController;
   List<Subscription> _subscriptions;
+  ProtocolHandler _protocolHandler;
 
   final Logger log = Logger("NatsClient");
 
@@ -60,6 +62,7 @@ class NatsClient {
       {ConnectionOptions connectionOptions,
       void onClusterupdate(ServerInfo info)}) async {
     _socket = await _tcpClient.connect();
+    _protocolHandler = ProtocolHandler(socket: _socket, log: log);
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data,
           connectionOptions: connectionOptions,
@@ -108,31 +111,30 @@ class NatsClient {
     return TcpClient(host: host, port: port);
   }
 
+  /// Carries over [Subscription] objects from one host to another during cluster rearrangement
   void _carryOverSubscriptions() {
     _subscriptions.forEach((subscription) {
-      _doSubscribe(true, subscription.subscriptionId, subscription.topic);
+      _doSubscribe(true, subscription.subscriptionId, subscription.subject);
     });
   }
 
   void _serverPushString(String serverPushString,
       {ConnectionOptions connectionOptions,
       void onClusterupdate(ServerInfo info)}) {
-    String infoPrefix = INFO;
-    String messagePrefix = MSG;
-    String pingPrefix = PING;
-
-    if (serverPushString.startsWith(infoPrefix)) {
-      _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""),
+    if (serverPushString.startsWith(INFO)) {
+      _setServerInfo(serverPushString.replaceFirst(INFO, ""),
           connectionOptions: connectionOptions);
       // If it is a new serverinfo packet, then call the update handler
       if (onClusterupdate != null) {
         onClusterupdate(_serverInfo);
       }
-    } else if (serverPushString.startsWith(messagePrefix)) {
+    } else if (serverPushString.startsWith(MSG)) {
       _convertToMessages(serverPushString)
           .forEach((msg) => _messagesController.add(msg));
-    } else if (serverPushString.startsWith(pingPrefix)) {
-      sendPong();
+    } else if (serverPushString.startsWith(PING)) {
+      _protocolHandler.sendPong();
+    } else if (serverPushString.startsWith(OK)) {
+      log.fine("Received server OK");
     }
   }
 
@@ -164,21 +166,8 @@ class NatsClient {
   }
 
   void _sendConnectionPacket(ConnectionOptions opts) {
-    var messageBuffer = CONNECT +
-        "{\"verbose\":${opts.verbose},\"pedantic\":${opts.pedantic},\"tls_required\":${opts.tlsRequired},\"name\":${opts.name},\"lang\":${opts.language},\"version\":${opts.version},\"protocol\":${opts.protocol}, \"user\":${opts.userName}, \"pass\":${opts.password}}" +
-        CR_LF;
-    _socket.write(messageBuffer);
-
-    // send ping after connect
-    sendPing();
-  }
-
-  void sendPong() {
-    _socket.write("$PONG$CR_LF");
-  }
-
-  void sendPing() {
-    _socket.write("$PING$CR_LF");
+    _protocolHandler.connect(opts: opts);
+    _protocolHandler.sendPing();
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response
@@ -193,21 +182,8 @@ class NatsClient {
       throw Exception(
           "Socket not ready. Please check if NatsClient.connect() is called");
     }
-
-    String messageBuffer;
-
-    int length = message.length;
-
-    if (replyTo != null) {
-      messageBuffer = "$PUB $subject $replyTo $length $CR_LF$message$CR_LF";
-    } else {
-      messageBuffer = "$PUB $subject $length $CR_LF$message$CR_LF";
-    }
-    try {
-      _socket.write(messageBuffer);
-    } catch (ex) {
-      log.severe(ex);
-    }
+    _protocolHandler.pubish(message, subject, () {}, (err) {},
+        replyTo: replyTo);
   }
 
   NatsMessage _convertToMessage(String serverPushString) {
@@ -261,27 +237,18 @@ class NatsClient {
       throw Exception(
           "Socket not ready. Please check if NatsClient.connect() is called");
     }
-    String messageBuffer;
 
-    if (queueGroup != null) {
-      messageBuffer = "$SUB $subject $queueGroup $subscriberId$CR_LF";
-    } else {
-      messageBuffer = "$SUB $subject $subscriberId$CR_LF";
-    }
-
-    try {
-      _socket.write(messageBuffer);
+    _protocolHandler.subscribe(subscriberId, subject, () {
       if (!isReconnect) {
         _subscriptions.add(Subscription()
           ..subscriptionId = subscriberId
-          ..topic = subject
+          ..subject = subject
           ..queueGroup = queueGroup);
       } else {
         log.fine("Carrying over subscription [${subject}]");
       }
-    } catch (ex) {
-      log.severe("Error while creating subscription $ex");
-    }
+    }, (err) {}, queueGroup: queueGroup);
+
     return _messagesController.stream.where((msg) => msg.subject == subject);
   }
 
@@ -290,20 +257,10 @@ class NatsClient {
       throw Exception(
           "Socket not ready. Please check if NatsClient.connect() is called");
     }
-    String messageBuffer;
 
-    if (waitUntilMessageCount != null) {
-      messageBuffer = "$UNSUB $subscriberId $waitUntilMessageCount$CR_LF";
-    } else {
-      messageBuffer = "$UNSUB $subscriberId$CR_LF";
-    }
-
-    try {
-      _socket.write(messageBuffer);
+    _protocolHandler.unsubscribe(subscriberId, waitUntilMessageCount, () {
       _subscriptions.removeWhere(
           (subscription) => subscription.subscriptionId == subscriberId);
-    } catch (ex) {
-      log.severe("Error while unsubscribing $subscriberId");
-    }
+    }, (ex) {});
   }
 }
