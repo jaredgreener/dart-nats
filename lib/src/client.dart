@@ -54,6 +54,7 @@ class NatsClient {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""),
           connectionOptions: connectionOptions);
 
+      print(serverPushString);
       // If it is a new serverinfo packet, then call the update handler
       if (onClusterupdate != null) {
         onClusterupdate(_serverInfo);
@@ -78,6 +79,11 @@ class NatsClient {
       _serverInfo.port = map["port"];
       _serverInfo.maxPayload = map["max_payload"];
       _serverInfo.clientId = map["client_id"];
+      try {
+          _serverInfo.serverUrls = map["connect_urls"].cast<String>();
+      } catch (e) {
+        print(e.toString());
+      }
       if (connectionOptions != null) {
         _sendConnectionPacket(connectionOptions);
       }
@@ -92,10 +98,17 @@ class NatsClient {
         CR_LF;
     print("Writing connection message $messageBuffer");
     _socket.write(messageBuffer);
+
+    // send ping after connect
+    sendPing();
   }
 
   void sendPong() {
     _socket.write("$PONG$CR_LF");
+  }
+
+  void sendPing() {
+    _socket.write("$PING$CR_LF");
   }
 
   /// Publishes the [message] to the [subject] with an optional [replyTo] set to receive the response

@@ -6,8 +6,8 @@ void main() async {
     int messagesSent = 100;
     int messagesReceived = 0;
 
-    var client1 = NatsClient("demo.nats.io", 4222);
-    var client2 = NatsClient("demo.nats.io", 4222);
+    var client1 = NatsClient("localhost", 4222);
+    var client2 = NatsClient("localhost", 4222);
     await client1.connect();
     await client2.connect();
 
