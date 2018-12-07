@@ -3,10 +3,13 @@ import 'tcp_client.dart';
 import 'server_info.dart';
 import 'nats_message.dart';
 import 'connection_options.dart';
+import 'subscription.dart';
 
 import 'dart:io';
 import "dart:convert";
 import 'dart:async';
+
+import 'package:logging/logging.dart';
 
 class NatsClient {
   String _currentHost;
@@ -20,14 +23,26 @@ class NatsClient {
   ServerInfo _serverInfo;
 
   StreamController<NatsMessage> _messagesController;
+  List<Subscription> _subscriptions;
 
-  NatsClient(String host, int port) {
+  final Logger log = Logger("NatsClient");
+
+  NatsClient(String host, int port, {Level logLevel = Level.INFO}) {
     _currentHost = host;
     _currentPort = port;
 
     _serverInfo = ServerInfo();
+    _subscriptions = List();
     _messagesController = new StreamController.broadcast();
     _tcpClient = TcpClient(host: host, port: port);
+    _initLogger(logLevel);
+  }
+
+  void _initLogger(Level level) {
+    Logger.root.level = level;
+    Logger.root.onRecord.listen((LogRecord rec) {
+      print('${rec.level.name}: ${rec.time}: ${rec.message}');
+    });
   }
 
   /// Connects to the given NATS url
@@ -45,13 +60,12 @@ class NatsClient {
       {ConnectionOptions connectionOptions,
       void onClusterupdate(ServerInfo info)}) async {
     _socket = await _tcpClient.connect();
-
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data,
           connectionOptions: connectionOptions,
           onClusterupdate: onClusterupdate);
     }, onDone: () {
-      print("Host down. Switching to next available host in cluster");
+      log.info("Host down. Switching to next available host in cluster");
       _removeCurrentHostFromServerInfo(_currentHost, _currentPort);
       _reconnectToNextAvailableInCluster(
           opts: connectionOptions, onClusterupdate: onClusterupdate);
@@ -62,31 +76,41 @@ class NatsClient {
       _serverInfo.serverUrls.removeWhere((url) => url == "$host:$port");
 
   void _reconnectToNextAvailableInCluster(
-      {ConnectionOptions opts, void onClusterupdate(ServerInfo info)}) {
+      {ConnectionOptions opts, void onClusterupdate(ServerInfo info)}) async {
     var urls = _serverInfo.serverUrls;
-
     bool isIPv6Address(String url) => url.contains("[") && url.contains("]");
-
-    urls.forEach((url) async {
-      print("Trying to connect to $url now");
-      int port = int.parse(url.split(":")[url.split(":").length - 1]);
-      String host;
-      if (isIPv6Address(url)) {
-        // IPv6 address
-        host = url.substring(url.indexOf("[") + 1, url.indexOf("]"));
-      } else {
-        // IPv4 address
-        host = url.substring(0, url.indexOf(":"));
-      }
-      _tcpClient = TcpClient(host: host, port: port);
+    for (var url in urls) {
+      _tcpClient = _createTcpClient(url, isIPv6Address);
       try {
         await connect(
             connectionOptions: opts, onClusterupdate: onClusterupdate);
-        print("Successfully switched to $url now");
-        return;
+        log.info("Successfully switched client to $url now");
+        _carryOverSubscriptions();
+        break;
       } catch (ex) {
-        print("Tried connecting to $url but failed. Moving on");
+        log.fine("Tried connecting to $url but failed. Moving on");
       }
+    }
+  }
+
+  /// Returns a [TcpClient] from the given [url]
+  TcpClient _createTcpClient(String url, bool checker(String url)) {
+    log.fine("Trying to connect to $url now");
+    int port = int.parse(url.split(":")[url.split(":").length - 1]);
+    String host;
+    if (checker(url)) {
+      // IPv6 address
+      host = url.substring(url.indexOf("[") + 1, url.indexOf("]"));
+    } else {
+      // IPv4 address
+      host = url.substring(0, url.indexOf(":"));
+    }
+    return TcpClient(host: host, port: port);
+  }
+
+  void _carryOverSubscriptions() {
+    _subscriptions.forEach((subscription) {
+      _doSubscribe(true, subscription.subscriptionId, subscription.topic);
     });
   }
 
@@ -100,8 +124,6 @@ class NatsClient {
     if (serverPushString.startsWith(infoPrefix)) {
       _setServerInfo(serverPushString.replaceFirst(infoPrefix, ""),
           connectionOptions: connectionOptions);
-
-      print(serverPushString);
       // If it is a new serverinfo packet, then call the update handler
       if (onClusterupdate != null) {
         onClusterupdate(_serverInfo);
@@ -131,13 +153,13 @@ class NatsClient {
           _serverInfo.serverUrls = map["connect_urls"].cast<String>();
         }
       } catch (e) {
-        print(e.toString());
+        log.severe(e.toString());
       }
       if (connectionOptions != null) {
         _sendConnectionPacket(connectionOptions);
       }
     } catch (ex) {
-      print(ex.toString());
+      log.severe(ex.toString());
     }
   }
 
@@ -145,7 +167,6 @@ class NatsClient {
     var messageBuffer = CONNECT +
         "{\"verbose\":${opts.verbose},\"pedantic\":${opts.pedantic},\"tls_required\":${opts.tlsRequired},\"name\":${opts.name},\"lang\":${opts.language},\"version\":${opts.version},\"protocol\":${opts.protocol}, \"user\":${opts.userName}, \"pass\":${opts.password}}" +
         CR_LF;
-    print("Writing connection message $messageBuffer");
     _socket.write(messageBuffer);
 
     // send ping after connect
@@ -185,11 +206,11 @@ class NatsClient {
     try {
       _socket.write(messageBuffer);
     } catch (ex) {
-      print(ex);
+      log.severe(ex);
     }
   }
 
-  NatsMessage convertToMessage(String serverPushString) {
+  NatsMessage _convertToMessage(String serverPushString) {
     var message = NatsMessage();
     List<String> lines = serverPushString.split(CR_LF);
     List<String> firstLineParts = lines[0].split(" ");
@@ -214,7 +235,7 @@ class NatsClient {
       serverPushString
           .split(MSG)
           .where((msg) => msg.length > 0)
-          .map((msg) => convertToMessage(msg))
+          .map((msg) => _convertToMessage(msg))
           .toList();
 
   /// Subscribes to the [subject] with a given [subscriberId] and an optional [queueGroup] set to group the responses
@@ -230,6 +251,12 @@ class NatsClient {
   /// ```
   Stream<NatsMessage> subscribe(String subscriberId, String subject,
       {String queueGroup}) {
+    return _doSubscribe(false, subscriberId, subject);
+  }
+
+  Stream<NatsMessage> _doSubscribe(
+      bool isReconnect, String subscriberId, String subject,
+      {String queueGroup}) {
     if (_socket == null) {
       throw Exception(
           "Socket not ready. Please check if NatsClient.connect() is called");
@@ -242,7 +269,19 @@ class NatsClient {
       messageBuffer = "$SUB $subject $subscriberId$CR_LF";
     }
 
-    _socket.write(messageBuffer);
+    try {
+      _socket.write(messageBuffer);
+      if (!isReconnect) {
+        _subscriptions.add(Subscription()
+          ..subscriptionId = subscriberId
+          ..topic = subject
+          ..queueGroup = queueGroup);
+      } else {
+        log.fine("Carrying over subscription [${subject}]");
+      }
+    } catch (ex) {
+      log.severe("Error while creating subscription $ex");
+    }
     return _messagesController.stream.where((msg) => msg.subject == subject);
   }
 
@@ -258,6 +297,13 @@ class NatsClient {
     } else {
       messageBuffer = "$UNSUB $subscriberId$CR_LF";
     }
-    _socket.write(messageBuffer);
+
+    try {
+      _socket.write(messageBuffer);
+      _subscriptions.removeWhere(
+          (subscription) => subscription.subscriptionId == subscriberId);
+    } catch (ex) {
+      log.severe("Error while unsubscribing $subscriberId");
+    }
   }
 }
