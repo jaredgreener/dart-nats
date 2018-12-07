@@ -21,6 +21,17 @@ await client.connect();
 ```
 **Note**: Never use a client without waiting for the connection to establish
 
+### Listening to cluster updates
+```dart
+var client = NatsClient("localhost", 4222);
+await client.connect(onClusterupdate: (serverInfo) {
+    // Something changed on the server.
+    // May be a new server came up, 
+    // Or something reeeeaallly bad happened
+    // Hmmmm ...
+});
+```
+
 ### Publishing a message
 Publishing a message can be done with or without a `reply-to` topic
 ```dart
