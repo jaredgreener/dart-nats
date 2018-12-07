@@ -6,8 +6,7 @@ void main() async {
 
   await client.connect(
       connectionOptions: ConnectionOptions()..protocol = 1,
-      onClusterupdate: (serverInfo) {
-      });
+      onClusterupdate: (serverInfo) {});
 
   client.subscribe("sub-1", "foo").listen((msg) {
     print("Got message: ${msg.payload}");
