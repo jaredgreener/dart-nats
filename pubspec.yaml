@@ -8,3 +8,4 @@ environment:
 dependencies:
   test: any
   logging: any
+  mockito: any

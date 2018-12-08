@@ -20,7 +20,7 @@ class NatsClient {
   int get currentPort => _currentPort;
 
   Socket _socket;
-  TcpClient _tcpClient;
+  TcpClient tcpClient;
   ServerInfo _serverInfo;
 
   StreamController<NatsMessage> _messagesController;
@@ -36,7 +36,7 @@ class NatsClient {
     _serverInfo = ServerInfo();
     _subscriptions = List();
     _messagesController = new StreamController.broadcast();
-    _tcpClient = TcpClient(host: host, port: port);
+    tcpClient = TcpClient(host: host, port: port);
     _initLogger(logLevel);
   }
 
@@ -61,7 +61,7 @@ class NatsClient {
   void connect(
       {ConnectionOptions connectionOptions,
       void onClusterupdate(ServerInfo info)}) async {
-    _socket = await _tcpClient.connect();
+    _socket = await tcpClient.connect();
     _protocolHandler = ProtocolHandler(socket: _socket, log: log);
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data,
@@ -83,7 +83,7 @@ class NatsClient {
     var urls = _serverInfo.serverUrls;
     bool isIPv6Address(String url) => url.contains("[") && url.contains("]");
     for (var url in urls) {
-      _tcpClient = _createTcpClient(url, isIPv6Address);
+      tcpClient = _createTcpClient(url, isIPv6Address);
       try {
         await connect(
             connectionOptions: opts, onClusterupdate: onClusterupdate);

@@ -19,6 +19,7 @@ void main() async {
     for (int i = 0; i < messagesSent; i++) {
       client2.publish("Hello world", "foo");
     }
+
     await Future.delayed(const Duration(seconds: 10));
     expect(messagesReceived, messagesSent);
   }, timeout: Timeout(Duration(seconds: 15)));
