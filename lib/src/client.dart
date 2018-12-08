@@ -60,8 +60,12 @@ class NatsClient {
   /// ```
   void connect(
       {ConnectionOptions connectionOptions,
+      void onConnect(),
       void onClusterupdate(ServerInfo info)}) async {
     _socket = await tcpClient.connect();
+    if (onConnect != null) {
+      onConnect();
+    }
     _protocolHandler = ProtocolHandler(socket: _socket, log: log);
     _socket.transform(utf8.decoder).listen((data) {
       _serverPushString(data,
@@ -177,13 +181,17 @@ class NatsClient {
   /// client.publish("Hello World", "foo-topic");
   /// client.publish("Hello World", "foo-topic", replyTo: "reply-topic");
   /// ```
-  void publish(String message, String subject, {String replyTo}) {
+  void publish(String message, String subject,
+      {void onSuccess(), void onError(Exception ex), String replyTo}) {
     if (_socket == null) {
       throw Exception(
           "Socket not ready. Please check if NatsClient.connect() is called");
     }
-    _protocolHandler.pubish(message, subject, () {}, (err) {},
-        replyTo: replyTo);
+    _protocolHandler.pubish(message, subject, () {
+      onSuccess();
+    }, (err) {
+      onError(err);
+    }, replyTo: replyTo);
   }
 
   NatsMessage _convertToMessage(String serverPushString) {
@@ -249,7 +257,13 @@ class NatsClient {
       }
     }, (err) {}, queueGroup: queueGroup);
 
-    return _messagesController.stream.where((msg) => msg.subject == subject);
+    return _messagesController.stream
+        .where((incomingMsg) => matchesRegex(subject, incomingMsg.subject));
+  }
+
+  bool matchesRegex(String listeningSubject, String incomingSubject) {
+    var expression = RegExp("$listeningSubject");
+    return expression.hasMatch(incomingSubject);
   }
 
   void unsubscribe(String subscriberId, {int waitUntilMessageCount}) {
