@@ -57,7 +57,7 @@ messageStream.listen((message) {
 ```
 
 ## Roadmap
-- Support clustering
+- Support clustered nats servers
 - Support multiple topic subscriptions
 
 ## Contributions
