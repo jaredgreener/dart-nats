@@ -1,16 +1,15 @@
-import 'package:nats/nats.dart';
-import 'package:logging/logging.dart';
 
-void main() async {
-  var client = NatsClient("localhost", 4222);
+import 'package:flutter_nats/nats.dart';
 
-  await client.connect(
-      connectionOptions: ConnectionOptions()..protocol = 1,
-      onClusterupdate: (serverInfo) {
-        //print("Got new update: ${serverInfo.serverUrls}");
-      });
-
-  client.subscribe("sub-1", "foo.*").listen((msg) {
-    print("Got message: ${msg.payload}");
-  });
-}
+// void main() async {
+//   var client = NatsClient("localhost", 4222,connectionOptions: ConnectionOptions()..protocol = 1,);
+//
+//   client.connect(onConnect: (){
+//
+//     client.subscribe("foo.*", (msg) {
+//       print("Got message: ${msg.payload}");
+//     });
+//
+//   });
+//
+// }

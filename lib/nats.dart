@@ -1,6 +1,6 @@
-export 'src/constants.dart';
-export 'src/errors.dart';
-export 'src/client.dart';
-export 'src/nats_message.dart';
-export 'src/connection_options.dart';
-export 'src/server_info.dart';
+export 'nats_client.dart';
+export 'models/nats_message.dart';
+export 'models/server_info.dart';
+export 'common/connection_options.dart';
+export 'common/constants.dart';
+export 'common/errors.dart';

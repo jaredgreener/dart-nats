@@ -1,11 +1,21 @@
-name: nats
+name: flutter_nats
 version: 0.1.0
-description: NATS client for Dart language
-author: Chaitanya Munukutla <chaitanya.m61292@gmail.com>
+description: NATS client for Flutter utilizing flutter bloc for event and state management
+author: Jared Green <jared@invictme.com>
 environment:
-  sdk: '>=2.0.0 <3.0.0'
+  sdk: '>=2.13.0 <3.0.0'
 
 dependencies:
+  flutter:
+    sdk: flutter
   test: any
   logging: any
   mockito: any
+  flutter_bloc: ^8.1.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: false
